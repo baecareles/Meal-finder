@@ -1,73 +1,91 @@
-const searchMeal = async (e) => {
-  e.preventDefault();
+const APIURL = 'https://api.github.com/users/'
 
-  // Select Elements
-  const input = document.querySelector(".input");
-  const title = document.querySelector(".title");
-  const info = document.querySelector(".info");
-  const img = document.querySelector(".img");
-  const ingredientsOutput = document.querySelector(".ingredients");
+const main = document.getElementById('main')
+const form = document.getElementById('form')
+const search = document.getElementById('search')
 
-  const showMealInfo = (meal) => {
-    const { strMeal, strMealThumb, strInstructions } = meal;
-    title.textContent = strMeal;
-    img.style.backgroundImage = `url(${strMealThumb})`;
-    info.textContent = strInstructions;
+async function getUser(username) {
+    try {
+        const { data } = await axios(APIURL + username)
 
-    const ingredients = [];
-
-    for (let i = 1; i <= 20; i++) {
-      if (meal[`strIngredient${i}`]) {
-        ingredients.push(
-          `${meal[`strIngredient${i}`]} - ${meal[`strMeasure${i}`]}`
-        );
-      } else {
-        break;
-      }
+        createUserCard(data)
+        getRepos(username)
+    } catch(err) {
+        if(err.response.status == 404) {
+            createErrorCard('No profile with this username')
+        }
     }
+}
 
-    const html = `
-    <span>${ingredients
-      .map((ing) => `<li class="ing">${ing}</li>`)
-      .join("")}</span>
-    `;
+async function getRepos(username) {
+    try {
+        const { data } = await axios(APIURL + username + '/repos?sort=created')
 
-    ingredientsOutput.innerHTML = html;
-  };
-
-  const showAlert = () => {
-    alert("Meal not found :(");
-  };
-
-  // Fetch Data
-  const fetchMealData = async (val) => {
-    const res = await fetch(
-      `https://www.themealdb.com/api/json/v1/1/search.php?s=${val}`
-    );
-
-    const { meals } = await res.json();
-    return meals;
-  };
-
-  // Get the user value
-  const val = input.value.trim();
-
-  if (val) {
-    const meals = await fetchMealData(val);
-
-    if (!meals) {
-      showAlert();
-      return;
+        addReposToCard(data)
+    } catch(err) {
+        createErrorCard('Problem fetching repos')
     }
+}
 
-    meals.forEach(showMealInfo);
-  } else {
-    alert("Please try searching for meal :)");
-  }
-};
+function createUserCard(user) {
+    const userID = user.name || user.login
+    const userBio = user.bio ? `<p>${user.bio}</p>` : ''
+    const cardHTML = `
+    <div class="card">
+    <div>
+      <img src="${user.avatar_url}" alt="${user.name}" class="avatar">
+    </div>
+    <div class="user-info">
+      <h2>${userID}</h2>
+      ${userBio}
+      <ul>
+        <li>${user.followers} <strong>Followers</strong></li>
+        <li>${user.following} <strong>Following</strong></li>
+        <li>${user.public_repos} <strong>Repos</strong></li>
+      </ul>
 
-const form = document.querySelector("form");
-form.addEventListener("submit", searchMeal);
+      <div id="repos"></div>
+    </div>
+  </div>
+    `
+    main.innerHTML = cardHTML
+    
+}
 
-const magnifier = document.querySelector(".magnifier");
-magnifier.addEventListener("click", searchMeal);
+function createErrorCard(msg) {
+    const cardHTML = `
+        <div class="card">
+            <h1>${msg}</h1>
+        </div>
+    `
+
+    main.innerHTML = cardHTML
+}
+
+function addReposToCard(repos) {
+    const reposEl = document.getElementById('repos')
+
+    repos
+        .slice(0, 5)
+        .forEach(repo => {
+            const repoEl = document.createElement('a')
+            repoEl.classList.add('repo')
+            repoEl.href = repo.html_url
+            repoEl.target = '_blank'
+            repoEl.innerText = repo.name
+
+            reposEl.appendChild(repoEl)
+        })
+}
+
+form.addEventListener('submit', (e) => {
+    e.preventDefault()
+
+    const user = search.value
+
+    if(user) {
+        getUser(user)
+
+        search.value = ''
+    }
+})
